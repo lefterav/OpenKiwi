@@ -56,7 +56,9 @@ class EstimatorConfig(PredictorConfig):
         predict_source=False,
         token_level=True,
         sentence_level=True,
+        sentence_level_analytic=True,
         sentence_ll=True,
+        sentence_analytic_ll=True,
         binary_level=True,
         target_bad_weight=2.0,
         source_bad_weight=2.0,
@@ -76,7 +78,9 @@ class EstimatorConfig(PredictorConfig):
         self.predict_source = predict_source
         self.token_level = token_level
         self.sentence_level = sentence_level
+        self.sentence_level_analytic = sentence_level_analytic
         self.sentence_ll = sentence_ll
+        self.sentence_analytic_ll = sentence_analytic_ll
         self.binary_level = binary_level
         self.target_bad_weight = target_bad_weight
         self.source_bad_weight = source_bad_weight
@@ -103,6 +107,7 @@ class Estimator(Model):
             self.config.predict_target
             or self.config.predict_gaps
             or self.config.sentence_level
+            or self.config.sentence_level_analytic
         )
         if predict_tgt and not predictor_tgt:
             predictor_tgt = Predictor(
@@ -216,6 +221,27 @@ class Estimator(Model):
                 nn.Tanh(),
                 nn.Linear(sentence_input_size // 4, 2),
             )
+        if self.config.sentence_level_analytic:
+            self.sentence_analytic_pred = nn.Sequential(
+                nn.Linear(sentence_input_size, sentence_input_size // 2),
+                nn.Sigmoid(),
+                nn.Linear(sentence_input_size // 2, sentence_input_size // 4),
+                nn.Sigmoid(),
+                nn.Linear(sentence_input_size // 4, 4),
+            )
+            self.sentence_sigma = None
+            if self.config.sentence_analytic_ll:
+                # Predict truncated Gaussian distribution
+                self.sentence_sigma = nn.Sequential(
+                    nn.Linear(sentence_input_size, sentence_input_size // 2),
+                    nn.Sigmoid(),
+                    nn.Linear(
+                        sentence_input_size // 2, sentence_input_size // 4
+                    ),
+                    nn.Sigmoid(),
+                    nn.Linear(sentence_input_size // 4, 4),
+                    nn.Sigmoid(),
+                )
 
         # Build Losses #
 
@@ -244,6 +270,9 @@ class Estimator(Model):
             )
         if self.config.sentence_level and not self.config.sentence_ll:
             self.mse_loss = nn.MSELoss(reduction='sum')
+        if (self.config.sentence_level_analytic
+            and not self.config.sentence_analytic_ll):
+            self.mse_loss = nn.MSELoss(reduction='sum')
         if self.config.binary_level:
             self.xent_binary = nn.CrossEntropyLoss(reduction='sum')
 
@@ -265,6 +294,8 @@ class Estimator(Model):
                 predict_gaps (bool): Predict gap tags
                 token_level (bool): Train predictor using PE field.
                 sentence_level (bool): Predict Sentence Scores
+                sentence_level_analytic (bool): Predict sentence level WER
+                                                errors
                 sentence_ll (bool): Use likelihood loss for sentence scores
                                     (instead of squared error)
                 binary_level: Predict binary sentence labels
@@ -295,6 +326,7 @@ class Estimator(Model):
             predict_source=opts.predict_source,
             token_level=opts.token_level,
             sentence_level=opts.sentence_level,
+            sentence_level_analytic=opts.sentence_level_analytic,
             sentence_ll=opts.sentence_ll,
             binary_level=opts.binary_level,
             target_bad_weight=opts.target_bad_weight,
@@ -320,6 +352,7 @@ class Estimator(Model):
             self.config.predict_target
             or self.config.predict_gaps
             or self.config.sentence_level
+            or self.config.sentence_level_analytic
         ):
             model_out_tgt = self.predictor_tgt(batch)
             input_seq, target_lengths = self.make_input(
@@ -357,6 +390,9 @@ class Estimator(Model):
         sentence_input = self.make_sentence_input(h_tgt, h_src)
         if self.config.sentence_level:
             outputs.update(self.predict_sentence(sentence_input))
+
+        if self.config.sentence_level_analytic:
+            outputs.update(self.predict_sentence_analytic(sentence_input))
 
         if self.config.binary_level:
             bin_logits = self.binary_pred(sentence_input).squeeze()
@@ -452,6 +488,17 @@ class Estimator(Model):
 
         return outputs
 
+    def predict_sentence_analytic(self, sentence_input):
+        """Compute Sentence level HTER editing operations."""
+        outputs = OrderedDict()
+        sentence_scores_analytic = self.sentence_analytic_pred(
+            sentence_input).squeeze()
+        outputs[const.SENTENCE_SCORES_ANALYTIC] = sentence_scores_analytic
+        if self.sentence_sigma:
+            pass
+            # TODO: handle sigmas
+        return outputs
+
     def predict_tags(self, contexts, out_embed=None):
         """Compute Tag Predictions."""
         if not out_embed:
@@ -481,6 +528,13 @@ class Estimator(Model):
             nll = partition_function.log() - normal.log_prob(sentence_scores)
             return nll.sum()
 
+    def sentence_analytic_loss(self, model_out, batch):
+        """Compute Sentence analytic HTER loss"""
+        # TODO:
+        sentence_pred = model_out[const.SENTENCE_SCORES_ANALYTIC]
+        # sentence_scores = batch.sentence_scores
+        pass
+
     def word_loss(self, model_out, batch):
         """Compute Sequence Tagging Loss"""
         word_loss = OrderedDict()
@@ -503,6 +557,9 @@ class Estimator(Model):
         if self.config.sentence_level:
             loss_sent = self.sentence_loss(model_out, batch)
             loss_dict[const.SENTENCE_SCORES] = loss_sent
+        if self.config.sentence_level_analytic:
+            loss_sent = self.sentence_analytic_loss(model_out, batch)
+            loss_dict[const.SENTENCE_SCORES_ANALYTIC] = loss_sent
         if self.config.binary_level:
             loss_bin = self.binary_loss(model_out, batch)
             loss_dict[const.BINARY] = loss_bin

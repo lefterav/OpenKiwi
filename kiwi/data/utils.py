@@ -279,6 +279,11 @@ def hter_to_binary(x):
     return ceil(float(x))
 
 
+def row_to_integers(x):
+    """Read a row of tab separated integers into a list"""
+    return x.split("\t")
+
+
 def wmt18_to_target(batch, *args):
     """Extract target tags from wmt18 format file.
     """

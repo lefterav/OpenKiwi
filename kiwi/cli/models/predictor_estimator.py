@@ -63,6 +63,11 @@ def _add_training_data_file_opts(parser):
         type=PathType(exists=True),
         help='Path to file containing sentence level scores.',
     )
+    group.add_argument(
+        '--train-sentence-scores-analytic',
+        type=PathType(exists=True),
+        help='Path to file containing sentence level HTER error types.',
+    )
 
     valid_group = parser.add_argument_group('validation data')
 
@@ -71,7 +76,6 @@ def _add_training_data_file_opts(parser):
         type=float,
         help='Split Train dataset in case that no validation set is given.',
     )
-
     valid_group.add_argument(
         '--valid-source',
         type=PathType(exists=True),
@@ -110,6 +114,11 @@ def _add_training_data_file_opts(parser):
         '--valid-sentence-scores',
         type=PathType(exists=True),
         help='Path to file containing sentence level scores.',
+    )
+    valid_group.add_argument(
+        '--valid-sentence-scores-analytic',
+        type=PathType(exists=True),
+        help='Path to file containing sentence level HTER edit operations.',
     )
 
 
@@ -398,6 +407,16 @@ def add_training_options(training_parser):
         Requires setting `train-sentence-scores, valid-sentence-scores`""",
     )
     group.add_argument(
+        '--sentence-level-analytic',
+        type=lambda x: bool(strtobool(x)),
+        nargs='?',
+        const=True,
+        default=False,
+        help="""Predict Sentence Level Scores.
+        Requires setting `train-sentence-scores-analytic,
+        valid-sentence-scores-analytic`""",
+    )
+    group.add_argument(
         '--sentence-ll',
         type=lambda x: bool(strtobool(x)),
         nargs='?',
@@ -424,6 +443,34 @@ def add_training_options(training_parser):
         truncated Gaussian is skewed to one side. set this to `True` to use
         the True mean after truncation for prediction.
         """,
+    )
+    group.add_argument(
+        '--sentence-analytic-ll',
+        type=lambda x: bool(strtobool(x)),
+        nargs='?',
+        const=True,
+        default=False,
+        help="""Use probabilistic Loss for sentence scores instead of
+        squared error. If set, the model will output mean and variance of
+        a truncated Gaussian distribution over the interval [0, 1], and use
+        the NLL of ground truth `hter` as the loss.
+        This seems to improve performance, and gives you uncertainty estimates
+        for sentence level predictions as a byproduct.
+        If `sentence-level == False`, this is without effect.
+        """,
+    )
+    group.add_argument(
+        '--sentence-analytic-ll-predict-mean',
+        type=lambda x: bool(strtobool(x)),
+        nargs='?',
+        const=True,
+        default=False,
+        help="""If `sentence-analytic-ll == True`, by default the
+        prediction for `hter` will be the mean of the Guassian /before
+        truncation/. After truncation, this will be the mode of the
+        distribution, but not the mean as truncated Gaussian is skewed to one
+        side. set this to `True` to use the True mean after truncation for
+        prediction. """
     )
     group.add_argument(
         '--use-probs',
@@ -497,6 +544,14 @@ def add_predicting_options(predicting_parser):
         const=True,
         default=False,
         help='Predict Sentence Level Scores',
+    )
+    group.add_argument(
+        '--sentence-level-analytic',
+        type=lambda x: bool(strtobool(x)),
+        nargs='?',
+        const=True,
+        default=False,
+        help='Predict Sentence Level HTER edit operations',
     )
     group.add_argument(
         '--binary-level',

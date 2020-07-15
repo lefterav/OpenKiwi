@@ -112,6 +112,21 @@ def build_fieldset(wmt18_format=False):
         required=None,
     )
 
+    pipe = data.Pipeline(utils.row_to_integers)
+    fieldset.add(
+        name=const.SENTENCE_SCORES_ANALYTIC,
+        # TODO: specify fieldset
+        field=data.Field(
+            sequential=False,
+            use_vocab=False,
+            dtype=torch.uint8,
+            preprocessing=pipe,
+            fix_length=4
+        ),
+        file_option_suffix='_sentence_scores_analytic',
+        required=None,
+    )
+
     pipe = data.Pipeline(utils.hter_to_binary)
     fieldset.add(
         name=const.BINARY,

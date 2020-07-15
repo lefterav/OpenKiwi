@@ -192,6 +192,10 @@ def _read_sentence_scores(sent_file):
     """Read File with numeric scores for sentences."""
     return np.array([line.strip() for line in open(sent_file)], dtype="float")
 
+def _read_sentence_scores_analytic(sent_file):
+    """Read File with numeric scores for sentences."""
+    return np.array([line.strip().split("\t") for line in open(sent_file)],
+                    dtype="uint8")
 
 def _tags_to_sentence_score(tags_sentences):
     scores = []
