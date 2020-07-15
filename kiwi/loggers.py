@@ -101,7 +101,7 @@ class TrackingLogger:
         pass
 
     @staticmethod
-    def log_param(key, value):
+    def log_param(key: object, value: object) -> object:
         pass
 
     @staticmethod

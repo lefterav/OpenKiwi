@@ -107,13 +107,13 @@ train-source: data/en-de/train/train.src
 train-target: data/en-de/train/train.mt
 train-pe: data/en-de/train/train.pe
 train-target-tags: data/en-de/train/train.tags
-train-sentence-scores-analytic: data/en-de/train/train.hter4
+train-sentence-scores-analytic: data/en-de/train/train.edits
 
 valid-source: data/en-de/dev/dev.src
 valid-target: data/en-de/dev/dev.mt
 valid-pe: data/en-de/dev/dev.pe
 valid-target-tags: data/en-de/dev/dev.tags
-valid-sentence-scores-analytic: data/en-de/dev/dev.hter4
+valid-sentence-scores-analytic: data/en-de/dev/dev.edits
 
 
 ### GENERAL OPTS ###
