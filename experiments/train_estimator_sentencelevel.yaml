@@ -100,24 +100,24 @@ load-pred-target: models/en-de/openkiwi-predictor/best_model.torch
 ###  DATA ###
 
 # Set to True to use target_tags in WMT18 format
-wmt18-format: false
+wmt18-format: True
 
 train-source: data/en-de/train/train.src
 train-target: data/en-de/train/train.mt
 train-pe: data/en-de/train/train.pe
-#train-target-tags: data/WMT17/word_level/train.tags
+train-target-tags: data/en-de/train/train.tags
 train-sentence-scores: data/en-de/train/train.hter
 
 valid-source: data/en-de/dev/dev.src
 valid-target: data/en-de/dev/dev.mt
 valid-pe: data/en-de/dev/dev.pe
-#valid-target-tags: data/en-de/iev.tags
+valid-target-tags: data/en-de/dev/dev.tags
 valid-sentence-scores: data/en-de/dev/dev.hter
 
 
 ### GENERAL OPTS ###
 
 # Experiment Name for MLFlow
-experiment-name: EN-DE Train Estimator sentence-level
+experiment-name: EN-DE Train Estimator WMTQE20
 # Do not set or set to negative number for CPU
 gpu-id: 0
