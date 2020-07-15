@@ -3,7 +3,7 @@
 model: estimator
 
 # Model Files will be saved here
-output-dir: runs/estimator
+output-dir: runs/estimator-sentencelevel
 
 #### MODEL SPECIFIC OPTS ####
 
@@ -35,7 +35,7 @@ sentence-level: True
 # distribution over the interval [0, 1], and use log-likelihood loss instead
 # of mean squared error.
 # Seems to improve performance
-sentence-ll: True
+sentence-ll: False
 # Predict Binary Label for each sentence, indicating hter == 0.0
 # Requires setting train-sentence-scores, valid-sentence-scores
 binary-level: False
