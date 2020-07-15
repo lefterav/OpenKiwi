@@ -532,8 +532,18 @@ class Estimator(Model):
         """Compute Sentence analytic HTER loss"""
         # TODO:
         sentence_pred = model_out[const.SENTENCE_SCORES_ANALYTIC]
-        # sentence_scores = batch.sentence_scores
-        pass
+        sentence_scores = batch.sentence_scores
+        if not self.sentence_sigma:
+            return self.mse_loss(sentence_pred, sentence_scores)
+        else:
+            sigma = model_out[const.SENT_SIGMA]
+            mean = model_out['SENT_MU']
+            # Compute log-likelihood of x given mu, sigma
+            normal = Normal(mean, sigma)
+            # Renormalize on [0,1] for truncated Gaussian
+            partition_function = (normal.cdf(1) - normal.cdf(0)).detach()
+            nll = partition_function.log() - normal.log_prob(sentence_scores)
+            return nll.sum()
 
     def word_loss(self, model_out, batch):
         """Compute Sequence Tagging Loss"""
