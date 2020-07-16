@@ -119,7 +119,7 @@ def build_fieldset(wmt18_format=False):
         field=data.Field(
             sequential=False,
             use_vocab=False,
-            dtype=torch.uint8,
+            dtype=torch.float,
             preprocessing=pipe,
             fix_length=4
         ),

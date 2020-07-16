@@ -67,6 +67,7 @@ TARGET_STACKED = 'target_stacked'
 
 # Constants for model output names
 SENT_SIGMA = 'sentence_sigma'
+SENT_SIGMA_ANALYTIC = 'sentence_sigma_analytic'
 LOSS = 'loss'
 PREQEFV = 'PreQEFV'
 POSTQEFV = 'PostQEFV'

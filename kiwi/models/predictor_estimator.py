@@ -58,7 +58,7 @@ class EstimatorConfig(PredictorConfig):
         sentence_level=True,
         sentence_level_analytic=True,
         sentence_ll=True,
-        sentence_analytic_ll=True,
+        sentence_analytic_ll=False,
         binary_level=True,
         target_bad_weight=2.0,
         source_bad_weight=2.0,
@@ -154,6 +154,7 @@ class Estimator(Model):
         self.mlp = None
         self.sentence_pred = None
         self.sentence_sigma = None
+        self.sentence_sigma_analytic = None
         self.binary_pred = None
         self.binary_scale = None
 
@@ -229,10 +230,10 @@ class Estimator(Model):
                 nn.Sigmoid(),
                 nn.Linear(sentence_input_size // 4, 4),
             )
-            self.sentence_sigma = None
+            self.sentence_sigma_analytic = None
             if self.config.sentence_analytic_ll:
                 # Predict truncated Gaussian distribution
-                self.sentence_sigma = nn.Sequential(
+                self.sentence_sigma_analytic = nn.Sequential(
                     nn.Linear(sentence_input_size, sentence_input_size // 2),
                     nn.Sigmoid(),
                     nn.Linear(
@@ -494,9 +495,23 @@ class Estimator(Model):
         sentence_scores_analytic = self.sentence_analytic_pred(
             sentence_input).squeeze()
         outputs[const.SENTENCE_SCORES_ANALYTIC] = sentence_scores_analytic
-        if self.sentence_sigma:
-            pass
-            # TODO: handle sigmas
+        if self.sentence_sigma_analytic:
+            # Predict truncated Gaussian on [0,1]
+            sigma = self.sentence_sigma_analytic(sentence_input).squeeze()
+            outputs[const.SENT_SIGMA_ANALYTIC] = sigma
+            outputs['SENT_MU'] = outputs[const.SENTENCE_SCORES_ANALYTIC]
+            mean = outputs['SENT_MU'].clone().detach()
+            # Compute log-likelihood of x given mu, sigma
+            normal = Normal(mean, sigma)
+            # Renormalize on [0,1] for truncated Gaussian
+            partition_function = (normal.cdf(1) - normal.cdf(0)).detach()
+            outputs[const.SENTENCE_SCORES_ANALYTIC] = mean + (
+                (
+                    sigma ** 2
+                    * (normal.log_prob(0).exp() - normal.log_prob(1).exp())
+                )
+                / partition_function
+            )
         return outputs
 
     def predict_tags(self, contexts, out_embed=None):
@@ -532,11 +547,16 @@ class Estimator(Model):
         """Compute Sentence analytic HTER loss"""
         # TODO:
         sentence_pred = model_out[const.SENTENCE_SCORES_ANALYTIC]
-        sentence_scores = batch.sentence_scores
-        if not self.sentence_sigma:
-            return self.mse_loss(sentence_pred, sentence_scores)
+        sentence_scores = batch.sentence_scores_analytic
+        losses = []
+
+        if not self.sentence_sigma_analytic:
+            for pred, score in zip(sentence_pred, sentence_scores):
+                losses.append(self.mse_loss(pred, score))
+            return sum(losses)
+        
         else:
-            sigma = model_out[const.SENT_SIGMA]
+            sigma = model_out[const.SENT_SIGMA_ANALYTIC]
             mean = model_out['SENT_MU']
             # Compute log-likelihood of x given mu, sigma
             normal = Normal(mean, sigma)
@@ -653,6 +673,14 @@ class Estimator(Model):
             if self.config.sentence_ll:
                 metrics.append(
                     LogMetric(targets=[('model_out', const.SENT_SIGMA)])
+                )
+        if self.config.sentence_level_analytic:
+            metrics.append(RMSEMetric(target_name=const.SENTENCE_SCORES_ANALYTIC))
+            metrics.append(PearsonMetric(target_name=const.SENTENCE_SCORES_ANALYTIC))
+            metrics.append(SpearmanMetric(target_name=const.SENTENCE_SCORES_ANALYTIC))
+            if self.config.sentence_analytic_ll:
+                metrics.append(
+                    LogMetric(targets=[('model_out', const.SENT_SIGMA_ANALYTIC)])
                 )
         if self.config.binary_level:
             metrics.append(

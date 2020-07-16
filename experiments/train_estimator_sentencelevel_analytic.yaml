@@ -37,6 +37,7 @@ sentence-level-analytic: True
 # of mean squared error.
 # Seems to improve performance
 sentence-ll: False
+sentence-analytic-ll: False
 # Predict Binary Label for each sentence, indicating hter == 0.0
 # Requires setting train-sentence-scores, valid-sentence-scores
 binary-level: False
